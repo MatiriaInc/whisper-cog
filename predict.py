@@ -59,7 +59,7 @@ class Predictor(BasePredictor):
 
             result = transcribe_with_vad(self.model, str(audio), self.vad_pipeline, verbose=True, language="en", **inputs)
         else:
-            result = self.model.transcribe(str(audio))
+            result = self.model.transcribe(str(audio), condition_on_previous_text= condition_on_previous_text)
 
         result_aligned = whisperx.align(result["segments"], self.alignment_model, self.metadata, str(audio), device="cuda" if torch.cuda.is_availabl\
 e() else "cpu")
