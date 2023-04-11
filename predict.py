@@ -61,8 +61,7 @@ class Predictor(BasePredictor):
         else:
             result = self.model.transcribe(str(audio), condition_on_previous_text= condition_on_previous_text)
 
-        result_aligned = whisperx.align(result["segments"], self.alignment_model, self.metadata, str(audio), device="cuda" if torch.cuda.is_availabl\
-e() else "cpu")
+        result_aligned = whisperx.align(result["segments"], self.alignment_model, self.metadata, str(audio), device="cuda" if torch.cuda.is_available() else "cpu")
 
         srt_path = Path(tempfile.mkdtemp()) / "transcription.srt"
         aligned_word_srt_path = Path(tempfile.mkdtemp()) / "word_aligned.srt"
@@ -74,8 +73,7 @@ e() else "cpu")
         open(aligned_word_srt_path, "w").write(write_srt(result_aligned["word_segments"]))
 
 
-        return ModelOutput(detected_language=result["language"],transcription=result_aligned["word_segments"], srt_file=Path(srt_path), aligned_srt_\
-file=Path(aligned_srt_path), aligned_word_srt_file=Path(aligned_word_srt_path))
+        return ModelOutput(detected_language=result["language"],transcription=result_aligned["word_segments"], srt_file=Path(srt_path), aligned_srt_file=Path(aligned_srt_path), aligned_word_srt_file=Path(aligned_word_srt_path))
 
 
 
