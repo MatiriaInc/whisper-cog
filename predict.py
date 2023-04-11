@@ -37,15 +37,15 @@ class Predictor(BasePredictor):
     def predict(
         self,
         audio: Path = Input(description="The audio for transcription"),
-        use_vad: bool = Input(default=False, description="Use VAD to run transcription.")
+        use_vad: bool = Input(default=False, description="Use VAD to run transcription."),
+        condition_on_previous_text: bool = Input(default=False, description="Condition prediction on previous text.")
 
     ) -> ModelOutput:
         """Run a single prediction on the model"""
+
         inputs = {
-            'condition_on_previous_text': False
+            'condition_on_previous_text': condition_on_previous_text
         }
-
-
 
         if use_vad:
 
