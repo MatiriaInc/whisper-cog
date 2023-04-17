@@ -9,6 +9,7 @@ build:
   python_packages:
     - torch==1.12.0
     - git+https://github.com/m-bain/whisperx.git
+    - srt
   run:
     - apt-get -qq update
     - curl https://sh.rustup.rs -sSf | sh -s -- -y

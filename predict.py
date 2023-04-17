@@ -14,6 +14,9 @@ from whisperx.asr import transcribe_with_vad
 from typing import Optional, Any
 import ffmpeg
 from whisper.audio import SAMPLE_RATE
+from whisperx.vad import load_vad_model
+from lyricMatch import fix_lyrics
+import srt as srt_parser
 
 class ModelOutput(BaseModel):
     detected_language: str
@@ -26,19 +29,16 @@ class Predictor(BasePredictor):
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
         self.hf_token = "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"
-        self.vad_pipeline = Inference(
-                "pyannote/segmentation",
-                pre_aggregation_hook=lambda segmentation: segmentation,
-                use_auth_token=self.hf_token,
-                device="cuda" if torch.cuda.is_available() else "cpu"
-            )
+        self.vad_pipeline = load_vad_model("cuda", 0.5, 0.363, use_auth_token=self.hf_token)
         self.model = whisper.load_model("large-v2", "cuda" if torch.cuda.is_available() else "cpu")
         self.alignment_model, self.metadata = whisperx.load_align_model(language_code="en", device="cuda" if torch.cuda.is_available() else "cpu")
     def predict(
         self,
-        audio: Path = Input(description="The audio for transcription"),
+        audio: Path = Input(description="The audio for transcription."),
+        lyrics: Path = Input(default=None, description="Text for lyrics of the song."),
         use_vad: bool = Input(default=False, description="Use VAD to run transcription."),
-        condition_on_previous_text: bool = Input(default=False, description="Condition prediction on previous text.")
+        condition_on_previous_text: bool = Input(default=False, description="Condition prediction on previous text."),
+        fix_lyrics: bool = Input(default=True, description="Run lyric match.")
 
     ) -> ModelOutput:
         """Run a single prediction on the model"""
@@ -59,9 +59,33 @@ class Predictor(BasePredictor):
 
             result = transcribe_with_vad(self.model, str(audio), self.vad_pipeline, verbose=True, language="en", **inputs)
         else:
-            result = self.model.transcribe(str(audio), condition_on_previous_text= condition_on_previous_text)
+            result = self.model.transcribe(str(audio), condition_on_previous_text=condition_on_previous_text)
 
-        result_aligned = whisperx.align(result["segments"], self.alignment_model, self.metadata, str(audio), device="cuda" if torch.cuda.is_available() else "cpu")
+        cache_path = Path(tempfile.mkdtemp()) / "cache.srt"
+
+        with open(cache_path, "w", encoding="utf-8") as srt:
+            srt.write(write_srt(result["segments"]))
+
+
+
+        if fix_lyrics and lyrics is not None:
+            transcription = fix_lyrics(cache_path, open(str(lyrics)))
+
+            # run forced alignment
+            transcription_list = []
+            transcription_generator = srt_parser.parse(transcription)
+            srt_content = list(transcription_generator)
+
+            for lyric in srt_content:
+                lyric.content = lyric.content.replace("\n", "\n ")
+                transcription_list.append(
+                    {"text": lyric.content, "start": lyric.start.total_seconds(), "end": lyric.end.total_seconds()})
+
+            result_aligned = whisperx.align(transcription_list, self.alignment_model, self.metadata, str(audio), device="cuda" if torch.cuda.is_available() else "cpu")
+            reinsertion_of_line_carriage(result_aligned, str(lyrics))
+
+        else:
+            result_aligned = whisperx.align(result["segments"], self.alignment_model, self.metadata, str(audio), device="cuda" if torch.cuda.is_available() else "cpu")
 
         srt_path = Path(tempfile.mkdtemp()) / "transcription.srt"
         aligned_word_srt_path = Path(tempfile.mkdtemp()) / "word_aligned.srt"
@@ -76,14 +100,73 @@ class Predictor(BasePredictor):
         return ModelOutput(detected_language=result["language"],transcription=result_aligned["word_segments"], srt_file=Path(srt_path), aligned_srt_file=Path(aligned_srt_path), aligned_word_srt_file=Path(aligned_word_srt_path))
 
 
+def reinsertion_of_line_carriage(result_aligned, artist_lyrics):
+    # we need the carriage returns to be in the word level data, but whisperx
+    # removes them when aligning and doesn't add them back in.
+    # We could either update whisperx to include the carriage returns
+    # (in which case we have to post our changes)
+    # or we could perhaps use the word level srt when we run lyric repair?
+    # and add the carriage-returns back in then, maybe?
+    # lyrics = open(artist_lyrics, "r", encoding="utf-8")
+    # lyric_phrases = lyrics.readlines()
+
+    lyric_phrases = []
+    line_text = ""
+
+    for segment in result_aligned['segments']:
+        lines = segment['text'].splitlines()
+
+        for line in lines:
+
+            line_text += line if line_text == "" else (" " + line)
+
+            if '\\n' in line.split()[-1]:
+                lyric_phrases.append(line_text.replace('\\n', ''))
+                line_text = ""
+
+    word_index = 0
+    for phrase in lyric_phrases:
+        words = phrase.split()
+        num_words_in_phrase = len(words)
+        final_word = words[-1:][0]
+
+        # sadly, we can't assume there is only one word per word_aligned entry
+        num_words_processed = 0
+        to_be_patched = None
+        while num_words_processed < num_words_in_phrase:
+            srt_content = result_aligned["word_segments"][word_index]
+            num_words_processed += len(srt_content["text"].split())
+            to_be_patched = result_aligned["word_segments"][word_index]
+            word_index += 1
+
+        target_word = to_be_patched["text"]
+        target_word.replace("\\n", "")
+        if target_word == final_word:
+            to_be_patched["text"] = target_word + '\\n'
 
 def write_srt(transcript):
     result = ""
+    srt_count = 1
     for i, segment in enumerate(transcript, start=1):
-        result += f"{i}\n"
-        result += f"{format_timestamp(segment['start'], always_include_hours=True, decimal_marker=',')} --> "
-        result += f"{format_timestamp(segment['end'], always_include_hours=True, decimal_marker=',')}\n"
-        result += f"{segment['text'].strip().replace('-->', '->')}\n"
-        result += "\n"
+        if 'seg-start' in segment:
+            for j in range(len(segment['seg-start'])):
+                final_text = segment['seg-text'][j].strip().replace('-->', '->').replace('\n ', '\n')
+                # final_text = final_text.replace('\\n', '')
+
+                result += f"{srt_count}\n"
+                result += f"{format_timestamp(segment['seg-start'][j] + segment['start'], always_include_hours=True, decimal_marker=',')} --> "
+                result += f"{format_timestamp((segment['seg-end'][j] -  segment['seg-start'][j] ) + segment['seg-start'][j] + segment['start'], always_include_hours=True, decimal_marker=',')}\n"
+                result += f"{final_text}\n"
+                result += "\n"
+                srt_count= srt_count + 1
+        else:
+            final_text = segment['text'].strip().replace('-->', '->').replace('\n ','\n')
+            # final_text = final_text.replace('\\n', '')
+            result += f"{srt_count}\n"
+            result += f"{format_timestamp(segment['start'], always_include_hours=True, decimal_marker=',')} --> "
+            result += f"{format_timestamp(segment['end'], always_include_hours=True, decimal_marker=',')}\n"
+            result += f"{final_text}\n"
+            result += "\n"
+            srt_count = srt_count + 1
 
     return result
