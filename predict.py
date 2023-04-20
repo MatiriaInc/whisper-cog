@@ -38,7 +38,7 @@ class Predictor(BasePredictor):
         lyrics: Path = Input(default=None, description="Text for lyrics of the song."),
         use_vad: bool = Input(default=False, description="Use VAD to run transcription."),
         condition_on_previous_text: bool = Input(default=False, description="Condition prediction on previous text."),
-        fix_lyrics: bool = Input(default=True, description="Run lyric match.")
+        fix: bool = Input(default=True, description="Run lyric match.")
 
     ) -> ModelOutput:
         """Run a single prediction on the model"""
@@ -68,7 +68,7 @@ class Predictor(BasePredictor):
 
 
 
-        if fix_lyrics and lyrics is not None:
+        if fix and lyrics is not None:
             transcription = fix_lyrics(cache_path, open(str(lyrics)))
 
             # run forced alignment
@@ -124,6 +124,17 @@ def reinsertion_of_line_carriage(result_aligned, artist_lyrics):
                 lyric_phrases.append(line_text.replace('\\n', ''))
                 line_text = ""
 
+
+    new_aligned = []
+    # Let's split words now.
+    for wi, word in enumerate(result_aligned["word_segments"]):
+        for split_entry in word["text"].split():
+            new_entry = word.copy()
+            new_entry["text"] = split_entry
+            new_aligned.append(new_entry)
+
+    result_aligned["word_segments"] = new_aligned
+
     word_index = 0
     for phrase in lyric_phrases:
         words = phrase.split()
@@ -133,7 +144,7 @@ def reinsertion_of_line_carriage(result_aligned, artist_lyrics):
         # sadly, we can't assume there is only one word per word_aligned entry
         num_words_processed = 0
         to_be_patched = None
-        while num_words_processed < num_words_in_phrase:
+        while num_words_processed < num_words_in_phrase and word_index < len(result_aligned["word_segments"]):
             srt_content = result_aligned["word_segments"][word_index]
             num_words_processed += len(srt_content["text"].split())
             to_be_patched = result_aligned["word_segments"][word_index]
