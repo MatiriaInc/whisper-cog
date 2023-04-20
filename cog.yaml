@@ -10,6 +10,9 @@ build:
     - torch==1.12.0
     - git+https://github.com/m-bain/whisperx.git
     - srt
+    - fuzzysearch
+    - pysrt
+    - num2words
   run:
     - apt-get -qq update
     - curl https://sh.rustup.rs -sSf | sh -s -- -y
