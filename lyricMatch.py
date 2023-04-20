@@ -8,11 +8,9 @@ import re
 def closest_end_of_word(line, char):
 
     count = char
-    print("THIS IS THE LINE:")
-    print(line)
+
     for i in range(char - 1, len(line)):
-        print("IN")
-        print("CHARACTER: " + line[i])
+
         if line[i] == ' ' or line[i] == '\n':
             return i
 
@@ -21,10 +19,8 @@ def closest_end_of_word(line, char):
 
 def closest_start_of_word(line, char):
     count = char
-    print("In the start: " + line)
     for i in reversed(range(char + 1)):
         prev_char = line[i-1]
-        print(prev_char)
         if i == 0 or line[i - 1] == ' ' or line[i - 1] == '\n':
             return i
 
@@ -36,15 +32,12 @@ def char_to_word(line, char):
             word_count += 1
         if i == char:
             if line[i] == '\n' or line[i] == ' ':
-                print("RETURNING HERE")
-                print(line)
-                print(line[i])
+
                 return word_count
             # elif line[i] != '\n' and line[i] != 0 and line[i - 1] == '\n':
             #     return word_count + 1
             else:
-                print("HAHAHA: " + line)
-                print(line[i])
+
 
                 return word_count
 
@@ -71,28 +64,23 @@ def fix_lyric(current_line, next_prediction, extend, distance_rating, last_word,
     exact_words = truth_words[last_word: last_word + current_line_size + extend]
 
     sentence = ''
-    print("----------------------------")
     for index in range(len(exact_words)):
         sentence = sentence + exact_words[index]
 
         if index != len(exact_words) - 1 and exact_words[index] != '' and exact_words[index][-1] != '\n':
             sentence = sentence + ' '
 
-    print("PREDICTION(TARGET): " + current_line)
-    print("SENTENCE:" + sentence)
 
     if len(current_line_words) > 2:
         last_words_on_prediction = current_line_words[-3] + ' ' + current_line_words[-2] + ' ' + current_line_words[
             -1] # + '\n'
     else:
         distance_rating = int(len(current_line) * 0.5)
-        print("WAKA")
-        print(distance_rating)
+
         last_words_on_prediction = ' '.join(current_line_words)
 
-    print("MATCH: " + last_words_on_prediction)
+
     adaptive_rating = int(len(last_words_on_prediction) * 0.3)
-    print("ADAPTIVE RATING: " + str(adaptive_rating))
     # distance_rating = adaptive_rating
     match = fuzzysearch.find_near_matches(last_words_on_prediction, sentence, max_l_dist=distance_rating)
     stop = []
@@ -109,32 +97,25 @@ def fix_lyric(current_line, next_prediction, extend, distance_rating, last_word,
             next_distance = int(len(next_line) * 0.5)
 
         stop = fuzzysearch.find_near_matches(next_line_first_words, sentence, max_l_dist=next_distance)
-        print("STOP: " + next_line_first_words)
 
     final = ''
     ends = False
 
     if (len(stop) == 0) and len(match) > 0 and match[-1].matched != '':
-        print("CASE 1: No stop but we matched the end.")
         end = closest_end_of_word(sentence, match[-1].end)
-        print("THE END:")
         final = sentence[0: end]
 
         ends = end is None or sentence[end] == '\n'
 
 
         worded = char_to_word(sentence, end)
-        print(match[-1])
         last_word = last_word + char_to_word(sentence, end)
 
     elif len(stop) != 0 and len(match) > 0 and match[-1].matched != '':
-        print("CASE 2: Found stop and we matched the end.")
 
         if stop[-1].start > match[-1].end and stop[-1].matched != '':
-            print("SUB 2a: Stop is beyond the end.")
             # TODO: RETURN TO END IF NOT WORKING OUT
             if match[-1].matched[-1] != '\n' and sentence[match[-1].end + 1] != ' ':
-                print("SUB 2b: splitting words.")
                 # print(stop)
                 # best_match = 50
                 # final_match = stop[-1]
@@ -154,16 +135,13 @@ def fix_lyric(current_line, next_prediction, extend, distance_rating, last_word,
                 ends = end is None or sentence[end] == '\n'
                 last_word = last_word + char_to_word(sentence, end)
             else:
-                print("SUB 2c: No splitting words.")
                 end = closest_end_of_word(sentence, match[-1].end)
                 final = sentence[0: end]
                 ends = end is None or sentence[end] == '\n'
                 last_word = last_word + char_to_word(sentence, end)
         else:
-            print("SUB 2d: Stop is before the end, this means we might have some repetitions.")
             # TODO: Must fix for repetitions. Make it smarter. Use length ad heuristic.
-            print(match)
-            print(len(match))
+
             end_start = stop[-1].start
             latest = -1
             latest_index = 0
@@ -171,14 +149,12 @@ def fix_lyric(current_line, next_prediction, extend, distance_rating, last_word,
                 if match[j].end >= latest and match[j].end < end_start:
                     latest = match[j].end
                     latest_index = j
-            print('CHOSEN ONE: ')
-            print(match[latest_index])
+
             end = closest_end_of_word(sentence, match[latest_index].end)
             final = sentence[0: end]
             ends = end is None or sentence[end] == '\n'
             last_word = last_word + char_to_word(sentence, end)
     elif len(match) == 0 and len(stop) != 0 and stop[-1].matched != '':
-        print("CASE 3: Found stop but no match on the end.")
 
         start = closest_start_of_word(sentence, stop[-1].start)
 
@@ -187,7 +163,6 @@ def fix_lyric(current_line, next_prediction, extend, distance_rating, last_word,
 
         last_word = last_word + char_to_word(sentence, start)
     else:
-        print("CASE 4: No stop and no match.")
         final, last_word, ends = fix_lyric(current_line, next_prediction, extend, distance_rating + 1, last_word, truth_words, try_count=try_count + 1)
         is_emoji = any(not c.isalnum() for c in current_line)
 
@@ -262,7 +237,6 @@ def fix_lyrics(prediction_file, lyrics):
 
 
 
-        print("Final: " + final)
 
         final_lyrics += '\n'
 
@@ -274,7 +248,6 @@ def fix_lyrics(prediction_file, lyrics):
     # close file
     text_file.close()
 
-    print(truth_words)
 
     return final_lyrics
 
