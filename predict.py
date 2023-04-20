@@ -57,7 +57,7 @@ class Predictor(BasePredictor):
                 ffmpeg.input(str(audio), threads=0).output(input_audio_path, ac=1, ar=SAMPLE_RATE).run(cmd=["ffmpeg"])
                 audio = input_audio_path
 
-            result = transcribe_with_vad(self.model, str(audio), self.vad_pipeline, verbose=True, language="en", **inputs)
+            result = transcribe_with_vad(self.model, str(audio), self.vad_pipeline, verbose=False, language="en", **inputs)
         else:
             result = self.model.transcribe(str(audio), condition_on_previous_text=condition_on_previous_text)
 
