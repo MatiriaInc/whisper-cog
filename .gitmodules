@@ -1,0 +1,3 @@
+[submodule "LyricFix"]
+	path = LyricFix
+	url = git@github.com:cdvm-matiria/LyricFix.git
