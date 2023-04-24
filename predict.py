@@ -15,7 +15,7 @@ from typing import Optional, Any
 import ffmpeg
 from whisper.audio import SAMPLE_RATE
 from whisperx.vad import load_vad_model
-from lyricMatch import fix_lyrics
+from LyricFix.lyricMatch import fix_lyrics
 import srt as srt_parser
 
 class ModelOutput(BaseModel):
@@ -30,7 +30,7 @@ class Predictor(BasePredictor):
         """Load the model into memory to make running multiple predictions efficient"""
         self.hf_token = "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"
         self.vad_pipeline = load_vad_model("cuda", 0.5, 0.363, use_auth_token=self.hf_token)
-        self.model = whisper.load_model("large-v2", "cuda" if torch.cuda.is_available() else "cpu")
+        self.model = whisper.load_model("large-v2", "cuda" if torch.cuda.is_available() else "cpu", download_root='.')
         self.alignment_model, self.metadata = whisperx.load_align_model(language_code="en", device="cuda" if torch.cuda.is_available() else "cpu")
     def predict(
         self,
@@ -38,8 +38,8 @@ class Predictor(BasePredictor):
         lyrics: Path = Input(default=None, description="Text for lyrics of the song."),
         use_vad: bool = Input(default=False, description="Use VAD to run transcription."),
         condition_on_previous_text: bool = Input(default=False, description="Condition prediction on previous text."),
+        extend_duration: float = Input(default=2.0, description="Amount to pad input segments by. If not using vad then recommended to use 2 seconds."),
         fix: bool = Input(default=True, description="Run lyric match.")
-
     ) -> ModelOutput:
         """Run a single prediction on the model"""
 
@@ -59,7 +59,7 @@ class Predictor(BasePredictor):
 
             result = transcribe_with_vad(self.model, str(audio), self.vad_pipeline, verbose=False, language="en", **inputs)
         else:
-            result = self.model.transcribe(str(audio), condition_on_previous_text=condition_on_previous_text)
+            result = self.model.transcribe(str(audio), condition_on_previous_text=condition_on_previous_text, language="en")
 
         cache_path = Path(tempfile.mkdtemp()) / "cache.srt"
 
@@ -81,7 +81,7 @@ class Predictor(BasePredictor):
                 transcription_list.append(
                     {"text": lyric.content, "start": lyric.start.total_seconds(), "end": lyric.end.total_seconds()})
 
-            result_aligned = whisperx.align(transcription_list, self.alignment_model, self.metadata, str(audio), device="cuda" if torch.cuda.is_available() else "cpu")
+            result_aligned = whisperx.align(transcription_list, self.alignment_model, self.metadata, str(audio), device="cuda" if torch.cuda.is_available() else "cpu", extend_duration=extend_duration)
             reinsertion_of_line_carriage(result_aligned, str(lyrics))
 
         else:
