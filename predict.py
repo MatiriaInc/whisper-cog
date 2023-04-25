@@ -54,7 +54,7 @@ class Predictor(BasePredictor):
 
                 audio_basename = os.path.splitext(os.path.basename(str(audio)))[0]
                 input_audio_path = os.path.join(os.path.dirname(str(audio)), audio_basename + ".wav")
-                ffmpeg.input(str(audio), threads=0).output(input_audio_path, ac=1, ar=SAMPLE_RATE).run(cmd=["ffmpeg"])
+                ffmpeg.input(str(audio), threads=0).output(input_audio_path, ac=1).run(cmd=["ffmpeg"])
                 audio = input_audio_path
 
             result = transcribe_with_vad(self.model, str(audio), self.vad_pipeline, verbose=False, language="en", **inputs)
