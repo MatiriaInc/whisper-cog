@@ -8,7 +8,7 @@ build:
   python_version: "3.9"
   python_packages:
     - torch==1.12.0
-    - git+https://github.com/m-bain/whisperx.git
+    - git+https://github.com/m-bain/whisperx.git@5b85c5433fef363d71a147a050d8089d206ce944
     - srt
     - fuzzysearch
     - pysrt
