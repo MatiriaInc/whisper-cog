@@ -24,6 +24,7 @@ class ModelOutput(BaseModel):
     srt_file: Path
     aligned_srt_file: Path
     aligned_word_srt_file: Path
+    warning: bool
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -47,6 +48,8 @@ class Predictor(BasePredictor):
             'condition_on_previous_text': condition_on_previous_text
         }
 
+        warning_flag=False
+
         if use_vad:
 
             if not str(audio).endswith(".wav"):
@@ -69,7 +72,7 @@ class Predictor(BasePredictor):
 
 
         if fix and lyrics is not None:
-            transcription = fix_lyrics(cache_path, open(str(lyrics)))
+            transcription, warning_flag = fix_lyrics(cache_path, open(str(lyrics)))
 
             # run forced alignment
             transcription_list = []
@@ -97,7 +100,7 @@ class Predictor(BasePredictor):
         open(aligned_word_srt_path, "w").write(write_srt(result_aligned["word_segments"]))
 
 
-        return ModelOutput(detected_language=result["language"],transcription=result_aligned["word_segments"], srt_file=Path(srt_path), aligned_srt_file=Path(aligned_srt_path), aligned_word_srt_file=Path(aligned_word_srt_path))
+        return ModelOutput(detected_language=result["language"],transcription=result_aligned["word_segments"], srt_file=Path(srt_path), aligned_srt_file=Path(aligned_srt_path), aligned_word_srt_file=Path(aligned_word_srt_path), warning=warning_flag)
 
 
 def reinsertion_of_line_carriage(result_aligned, artist_lyrics):
