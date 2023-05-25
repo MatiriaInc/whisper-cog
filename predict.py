@@ -19,6 +19,7 @@ class ModelOutput(BaseModel):
     srt_file: Path
     aligned_srt_file: Path
     aligned_word_srt_file: Path
+    warning: bool
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -56,6 +57,8 @@ class Predictor(BasePredictor):
             'condition_on_previous_text': condition_on_previous_text
         }
 
+        warning_flag=False
+
         if use_vad:
 
             # VAD can only deal with WAV files. If an MP3 is sent, then we will use FFMPEG to convert MP3 to WAV.
@@ -79,7 +82,7 @@ class Predictor(BasePredictor):
         if fix and lyrics is not None:
 
             # Run lyric fix...
-            transcription = fix_lyrics(cache_path, open(str(lyrics)))
+            transcription, warning_flag = fix_lyrics(cache_path, open(str(lyrics)))
 
             transcription_list = []
             transcription_generator = srt_parser.parse(transcription)
@@ -113,7 +116,8 @@ class Predictor(BasePredictor):
         open(aligned_srt_path, "w").write(get_srt_string(result_aligned[KEY_SEGMENTS]))
         open(aligned_word_srt_path, "w").write(get_srt_string(result_aligned[KEY_WORD_SEGMENTS]))
 
-        return ModelOutput(detected_language=result[KEY_LANGUAGE],transcription=result_aligned[KEY_WORD_SEGMENTS], srt_file=Path(srt_path), aligned_srt_file=Path(aligned_srt_path), aligned_word_srt_file=Path(aligned_word_srt_path))
+
+        return ModelOutput(detected_language=result[KEY_LANGUAGE],transcription=result_aligned[KEY_WORD_SEGMENTS], srt_file=Path(srt_path), aligned_srt_file=Path(aligned_srt_path), aligned_word_srt_file=Path(aligned_word_srt_path), warning=warning_flag)
 
 
 def reinsertion_of_line_carriage(result_aligned):
