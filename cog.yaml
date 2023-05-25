@@ -1,7 +1,6 @@
-# Configuration for Cog ⚙️
-# Reference: https://github.com/replicate/cog/blob/main/docs/yaml.md
 
 build:
+  # Modify this to False if you want to use CPU instead.
   gpu: True
   system_packages:
     - "ffmpeg"
@@ -17,6 +16,5 @@ build:
     - apt-get -qq update
     - curl https://sh.rustup.rs -sSf | sh -s -- -y
     - PATH="/root/.cargo/bin:${PATH}"
-# predict.py defines how predictions are run on your model
 predict: "predict.py:Predictor"
 
