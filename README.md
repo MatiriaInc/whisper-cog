@@ -31,6 +31,12 @@ We need to download the large-v2 model for caching:
 wget https://openaipublic.azureedge.net/main/whisper/models/81f7c96c852ee8fc832187b0132e569d6c3065a3252ed18e56effd0b6a73e524/large-v2.pt
 ```
 
+Then initialize the lyric fix submodule:
+
+```bash
+git submodule update --init
+```
+
 <a name="building"></a>
 ## Building The Project
 To build a GPU version of this project, you must have an NVIDIA GPU.
